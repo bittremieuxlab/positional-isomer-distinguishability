@@ -1,12 +1,16 @@
+import logging
+from functools import partial
+from multiprocessing import cpu_count, Pool
 from pathlib import Path
 
-from MSCI.Grouping_MS1.Grouping_mw_irt import process_peptide_combinations
+import pandas as pd
 from MSCI.Preprocessing.Koina import PeptideProcessor
 from MSCI.Preprocessing.Parsing import read_msp_file
-from MSCI.Similarity.spectral_angle_similarity import process_spectra_pairs
 from matchms.importing import load_from_msp
+from utils import process_spectra_pairs, process_peptide_combinations
 
 from argparse import ArgumentParser
+logging.getLogger("matchms").setLevel(logging.ERROR)
 
 parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
 parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
@@ -60,6 +64,24 @@ parser.add_argument(
 args = parser.parse_args()
 
 
+
+def parallelize(func, data, n_chunks=None, **kwargs):
+    if n_chunks is None:
+        n_chunks = cpu_count()
+
+    # Split into chunks
+    chunk_size = (len(data) + n_chunks - 1) // n_chunks
+    chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
+
+    # Use partial to pass extra args
+    func_with_args = partial(func, **kwargs)
+
+    with Pool(n_chunks) as pool:
+        dfs = pool.map(func_with_args, chunks)
+
+    return pd.concat(dfs, ignore_index=True)
+
+
 def find_indistinguishable_peptides(
     input_file: str,
     collision_energy: int = 30,
@@ -71,6 +93,7 @@ def find_indistinguishable_peptides(
     peak_tolerance: int | float = 0,
     peak_ppm: int | float = 10,
     output_file: str = None,
+    n_chunks: int = 1,
 ):
     """
     From a given file with peptides find those that could be indistinguishable
@@ -108,15 +131,23 @@ def find_indistinguishable_peptides(
     if Path(pred_file).stat().st_size == 0:
         raise RuntimeError("Generating spectrum predictions failed")
 
+    print("Got spectrum predictions")
     spectra = list(load_from_msp(pred_file))
     mz_irt_df = read_msp_file(pred_file)
     groups_df = process_peptide_combinations(
         mz_irt_df, mz_tolerance, irt_tolerance, use_ppm=False
     )
+    print("Got peptide groups")
     groups_df.columns = groups_df.columns.str.replace(" ", "")
     index_array = groups_df[["index1", "index2"]].values.astype(int)
-    result = process_spectra_pairs(
-        index_array, spectra, mz_irt_df, tolerance=peak_tolerance, ppm=peak_ppm
+    result = parallelize(
+        process_spectra_pairs,
+        index_array,
+        n_chunks=n_chunks,
+        spectra=spectra,
+        mz_irt_df=mz_irt_df,
+        tolerance=peak_tolerance,
+        ppm=peak_ppm,
     )
     result.to_csv(output_file, index=False)
 
