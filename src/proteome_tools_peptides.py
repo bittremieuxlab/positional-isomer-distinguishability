@@ -3,7 +3,7 @@ from itertools import combinations
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from src.utils import read_pool_file
+from src.utils import read_pool_dir
 
 import random
 import os
@@ -66,24 +66,22 @@ def find_positional_isomers(
     return isomer_pairs
 
 
-if __name__ == "__main__":
-    list_files = os.listdir("data/")
-    df_list = []
-    for file in list_files:
-        if file.endswith(".txt"):
-            df = read_pool_file(os.path.join("data", file))
-            df_list.append(df)
-    df_all = pd.concat(df_list).drop_duplicates().reset_index(drop=True)
-    # Select 1000 random peptides from the dataframe
-    len(df_all["Sequence"].unique().tolist())
-    peptides = random.sample(df_all["Sequence"].unique().tolist(), 100000)
-    isomers = find_positional_isomers(
-        df_all["Sequence"].unique().tolist(), max_workers=8
-    )
-    # Save results
+def main(data_folder: str = "data"):
+    df = read_pool_dir(data_folder)
+    isomers = find_positional_isomers(df["Sequence"].unique().tolist(), max_workers=8)
     df_isomers = pd.DataFrame(isomers, columns=["Peptide1", "Peptide2"])
+    # Put both columns under one column and drop duplicates
+    df_all_isomers = (
+        pd.concat([df_isomers["Peptide1"], df_isomers["Peptide2"]])
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
+    df_all_isomers.to_csv(
+        "positional_isomers_msci_input.csv",
+        index=False,
+        header=False,
+    )
 
-df_isomers.to_csv(
-    "/Users/adams/Projects/indistinguishable-peptides/positional-isomers/positional_isomers.csv",
-    index=False,
-)
+
+if __name__ == "__main__":
+    main()
