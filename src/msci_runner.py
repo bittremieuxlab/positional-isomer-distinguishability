@@ -17,7 +17,6 @@ def find_indistinguishable_peptides(
     irt_tolerance: int | float = 5,
     peak_tolerance: int | float = 0,
     peak_ppm: int | float = 10,
-    min_similarity: float = 0.7,
     output_file: str = None,
 ):
     """
@@ -32,7 +31,6 @@ def find_indistinguishable_peptides(
     :param irt_tolerance: tolerance for irt difference for peptides to be considered in similarity calculation
     :param peak_tolerance: tolerance used when matching peaks
     :param peak_ppm: also used for tolerance when matching peaks
-    :param min_similarity: Filter on final similarity score
     :param output_file: path to output file or, if None, reuse the path and filename of the input file with different extension
     :return:
     """
@@ -67,7 +65,6 @@ def find_indistinguishable_peptides(
     result = process_spectra_pairs(
         index_array, spectra, mz_irt_df, tolerance=peak_tolerance, ppm=peak_ppm
     )
-    result = result[result["similarity_score"] >= min_similarity]
     result.to_csv(output_file, index=False)
 
 
