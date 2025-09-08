@@ -24,5 +24,5 @@ if __name__ == "__main__":
         db = db.sample(n=int(s))
         pep_file = f"random_dbs/pos_iso_{s}.txt"
         write_db(db, out_path=pep_file, col_name=0)
-        find_indistinguishable_peptides(pep_file, n_chunks=20)
+        find_indistinguishable_peptides(pep_file)
         print(f"Size {s} took {time.time() - t:.2f} seconds")

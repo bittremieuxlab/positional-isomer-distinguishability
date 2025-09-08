@@ -10,59 +10,68 @@ from matchms.importing import load_from_msp
 from utils import process_spectra_pairs, process_peptide_combinations
 
 from argparse import ArgumentParser
+
 logging.getLogger("matchms").setLevel(logging.ERROR)
 
-parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
-parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
-parser.add_argument("--output", "-o", help="Output file")
-parser.add_argument(
-    "--collision_energy", "-ce", type=int, default=30, help="Collision energy"
-)
-parser.add_argument("--charge", "-c", type=int, default=2, help="Charge")
-parser.add_argument(
-    "--model_intensity",
-    "-mi",
-    type=str,
-    default="Prosit_2020_intensity_HCD",
-    help="Model for intensity prediction",
-)
-parser.add_argument(
-    "--model_irt",
-    "-mirt",
-    type=str,
-    default="Prosit_2019_irt",
-    help="Model for iRT prediction",
-)
-parser.add_argument(
-    "--mz_tolerance",
-    "-mzt",
-    type=float,
-    default=1,
-    help="m/z tolerance for grouping peptides",
-)
-parser.add_argument(
-    "--irt_tolerance",
-    "-irtt",
-    type=float,
-    default=5,
-    help="iRT tolerance for grouping peptides",
-)
-parser.add_argument(
-    "--peak_tolerance",
-    "-pt",
-    type=float,
-    default=0,
-    help="Tolerance for peak matching in similarity calculation",
-)
-parser.add_argument(
-    "--peak_ppm",
-    "-ppm",
-    type=float,
-    default=10,
-    help="PPM tolerance for peak matching in similarity calculation",
-)
-args = parser.parse_args()
 
+def parse_args():
+    parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
+    parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
+    parser.add_argument("--output", "-o", help="Output file")
+    parser.add_argument(
+        "--collision_energy", "-ce", type=int, default=30, help="Collision energy"
+    )
+    parser.add_argument("--charge", "-c", type=int, default=2, help="Charge")
+    parser.add_argument(
+        "--model_intensity",
+        "-mi",
+        type=str,
+        default="Prosit_2020_intensity_HCD",
+        help="Model for intensity prediction",
+    )
+    parser.add_argument(
+        "--model_irt",
+        "-mirt",
+        type=str,
+        default="Prosit_2019_irt",
+        help="Model for iRT prediction",
+    )
+    parser.add_argument(
+        "--mz_tolerance",
+        "-mzt",
+        type=float,
+        default=1,
+        help="m/z tolerance for grouping peptides",
+    )
+    parser.add_argument(
+        "--irt_tolerance",
+        "-irtt",
+        type=float,
+        default=5,
+        help="iRT tolerance for grouping peptides",
+    )
+    parser.add_argument(
+        "--peak_tolerance",
+        "-pt",
+        type=float,
+        default=0,
+        help="Tolerance for peak matching in similarity calculation",
+    )
+    parser.add_argument(
+        "--peak_ppm",
+        "-ppm",
+        type=float,
+        default=10,
+        help="PPM tolerance for peak matching in similarity calculation",
+    )
+    parser.add_argument(
+        "--n-chunks",
+        "-nc",
+        type=int,
+        default=None,
+        help="Number of chunks to process in parallel, default (None) uses your cpu count.",
+    )
+    return parser.parse_args()
 
 
 def parallelize(func, data, n_chunks=None, **kwargs):
@@ -93,7 +102,7 @@ def find_indistinguishable_peptides(
     peak_tolerance: int | float = 0,
     peak_ppm: int | float = 10,
     output_file: str = None,
-    n_chunks: int = 1,
+    n_chunks: int = None,
 ):
     """
     From a given file with peptides find those that could be indistinguishable
@@ -108,6 +117,8 @@ def find_indistinguishable_peptides(
     :param peak_tolerance: tolerance used when matching peaks
     :param peak_ppm: also used for tolerance when matching peaks
     :param output_file: path to output file or, if None, reuse the path and filename of the input file with different extension
+    :param n_chunks: number of chunks to process in parallel, default (None) uses your cpu count.
+
     :return:
     """
     processor = PeptideProcessor(
@@ -153,6 +164,7 @@ def find_indistinguishable_peptides(
 
 
 if __name__ == "__main__":
+    args = parse_args()
     find_indistinguishable_peptides(
         input_file=args.input,
         collision_energy=args.collision_energy,
@@ -164,4 +176,5 @@ if __name__ == "__main__":
         peak_tolerance=args.peak_tolerance,
         peak_ppm=args.peak_ppm,
         output_file=args.output,
+        n_chunks=args.n_chunks,
     )
