@@ -1,12 +1,14 @@
 import logging
 from functools import partial
-from multiprocessing import cpu_count, Pool
+from multiprocessing import cpu_count, Pool, Manager
 from pathlib import Path
 
 import pandas as pd
 from MSCI.Preprocessing.Koina import PeptideProcessor
 from MSCI.Preprocessing.Parsing import read_msp_file
 from matchms.importing import load_from_msp
+from tqdm import tqdm
+
 from utils import process_spectra_pairs, process_peptide_combinations
 
 from argparse import ArgumentParser
@@ -74,19 +76,54 @@ def parse_args():
     return parser.parse_args()
 
 
-def parallelize(func, data, n_chunks=None, **kwargs):
+def parallel_process_spectra_pairs(
+    spectra_pairs, spectra, mz_irt_df, tolerance=0, ppm=0, m=0, n=0.5, n_chunks=None
+):
+    """
+    spectra_pairs: list of (i,j) index tuples
+    spectra: list of spectra objects
+    mz_irt_df: DataFrame with peptide info
+    """
+
     if n_chunks is None:
         n_chunks = cpu_count()
 
-    # Split into chunks
-    chunk_size = (len(data) + n_chunks - 1) // n_chunks
-    chunks = [data[i : i + chunk_size] for i in range(0, len(data), chunk_size)]
+    # Split the pairs into roughly equal chunks
+    chunk_size = (len(spectra_pairs) + n_chunks - 1) // n_chunks
+    chunks = [
+        spectra_pairs[i : i + chunk_size]
+        for i in range(0, len(spectra_pairs), chunk_size)
+    ]
 
-    # Use partial to pass extra args
-    func_with_args = partial(func, **kwargs)
+    with Manager() as manager:
+        progress_queue = manager.Queue()
+        func = partial(
+            process_spectra_pairs,
+            spectra=spectra,
+            mz_irt_df=mz_irt_df,
+            tolerance=tolerance,
+            ppm=ppm,
+            m=m,
+            n=n,
+            progress_queue=progress_queue,
+        )
 
-    with Pool(n_chunks) as pool:
-        dfs = pool.map(func_with_args, chunks)
+        with Pool(n_chunks) as pool:
+            # Launch jobs
+            results_async = pool.map_async(func, chunks)
+
+            # Show progress bar
+            with tqdm(
+                total=len(spectra_pairs), desc="Processing spectra pairs"
+            ) as pbar:
+                processed = 0
+                while processed < len(spectra_pairs):
+                    progress_queue.get()
+                    processed += 1
+                    pbar.update(1)
+
+            # Collect results
+            dfs = results_async.get()
 
     return pd.concat(dfs, ignore_index=True)
 
@@ -151,8 +188,7 @@ def find_indistinguishable_peptides(
     print("Got peptide groups")
     groups_df.columns = groups_df.columns.str.replace(" ", "")
     index_array = groups_df[["index1", "index2"]].values.astype(int)
-    result = parallelize(
-        process_spectra_pairs,
+    result = parallel_process_spectra_pairs(
         index_array,
         n_chunks=n_chunks,
         spectra=spectra,

@@ -36,7 +36,9 @@ def write_db(db, out_path, col_name="Sequence"):
     db[col_name].to_csv(out_path, index=False, header=False)
 
 
-def process_spectra_pairs(chunk, spectra, mz_irt_df, tolerance=0, ppm=0, m=0, n=0.5):
+def process_spectra_pairs(
+    chunk, spectra, mz_irt_df, tolerance=0, ppm=0, m=0, n=0.5, progress_queue=None
+):
     results = []
 
     for index_pair in chunk:
@@ -67,6 +69,9 @@ def process_spectra_pairs(chunk, spectra, mz_irt_df, tolerance=0, ppm=0, m=0, n=
                 "similarity_score": angle,
             }
         )
+
+        if progress_queue is not None:
+            progress_queue.put(1)  # report progress
 
     return pd.DataFrame(results)
 
