@@ -6,6 +6,12 @@ from MSCI.Preprocessing.Parsing import read_msp_file
 from MSCI.Similarity.spectral_angle_similarity import process_spectra_pairs
 from matchms.importing import load_from_msp
 
+from argparse import ArgumentParser
+
+parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
+parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
+args = parser.parse_args()
+
 
 def find_indistinguishable_peptides(
     input_file: str,
@@ -69,4 +75,15 @@ def find_indistinguishable_peptides(
 
 
 if __name__ == "__main__":
-    find_indistinguishable_peptides("random_dbs/1000.txt")
+    find_indistinguishable_peptides(
+        input_file=args.input,
+        collision_energy=30,
+        charge=2,
+        model_intensity="Prosit_2020_intensity_HCD",
+        model_irt="Prosit_2019_irt",
+        mz_tolerance=1,
+        irt_tolerance=5,
+        peak_tolerance=0,
+        peak_ppm=10,
+        output_file=None,
+    )
