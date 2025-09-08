@@ -10,6 +10,53 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
 parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
+parser.add_argument("--output", "-o", help="Output file")
+parser.add_argument(
+    "--collision_energy", "-ce", type=int, default=30, help="Collision energy"
+)
+parser.add_argument("--charge", "-c", type=int, default=2, help="Charge")
+parser.add_argument(
+    "--model_intensity",
+    "-mi",
+    type=str,
+    default="Prosit_2020_intensity_HCD",
+    help="Model for intensity prediction",
+)
+parser.add_argument(
+    "--model_irt",
+    "-mirt",
+    type=str,
+    default="Prosit_2019_irt",
+    help="Model for iRT prediction",
+)
+parser.add_argument(
+    "--mz_tolerance",
+    "-mzt",
+    type=float,
+    default=1,
+    help="m/z tolerance for grouping peptides",
+)
+parser.add_argument(
+    "--irt_tolerance",
+    "-irtt",
+    type=float,
+    default=5,
+    help="iRT tolerance for grouping peptides",
+)
+parser.add_argument(
+    "--peak_tolerance",
+    "-pt",
+    type=float,
+    default=0,
+    help="Tolerance for peak matching in similarity calculation",
+)
+parser.add_argument(
+    "--peak_ppm",
+    "-ppm",
+    type=float,
+    default=10,
+    help="PPM tolerance for peak matching in similarity calculation",
+)
 args = parser.parse_args()
 
 
@@ -77,13 +124,13 @@ def find_indistinguishable_peptides(
 if __name__ == "__main__":
     find_indistinguishable_peptides(
         input_file=args.input,
-        collision_energy=30,
-        charge=2,
-        model_intensity="Prosit_2020_intensity_HCD",
-        model_irt="Prosit_2019_irt",
-        mz_tolerance=1,
-        irt_tolerance=5,
-        peak_tolerance=0,
-        peak_ppm=10,
-        output_file=None,
+        collision_energy=args.collision_energy,
+        charge=args.charge,
+        model_intensity=args.model_intensity,
+        model_irt=args.model_irt,
+        mz_tolerance=args.mz_tolerance,
+        irt_tolerance=args.irt_tolerance,
+        peak_tolerance=args.peak_tolerance,
+        peak_ppm=args.peak_ppm,
+        output_file=args.output,
     )
