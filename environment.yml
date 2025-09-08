@@ -1,0 +1,9 @@
+name: msci
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pandas
+  - pip:
+    - MSCI==0.2.3
+    - pyopenms
