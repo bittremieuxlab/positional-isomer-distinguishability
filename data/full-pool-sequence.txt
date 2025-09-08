@@ -1,4 +1,4 @@
-pool_name,Sequence,QC_type,Gene_names
+Pool_name,Sequence,QC_type,Gene_names
 TUM_first_pool_1,FSPVLGR,,AAAS
 TUM_first_pool_1,AYASLFR,,ABCA4
 TUM_first_pool_1,EVGVWRQTR,,ABCA5
