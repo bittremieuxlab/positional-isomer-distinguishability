@@ -1,20 +1,31 @@
-from pathlib import Path
 import pandas as pd
-
-from MSCI.Grouping_MS1.Grouping_mw_irt import process_peptide_combinations
-from MSCI.Preprocessing.Koina import PeptideProcessor
-from MSCI.Preprocessing.Parsing import read_msp_file
-from MSCI.Similarity.spectral_angle_similarity import process_spectra_pairs
-from matchms.importing import load_from_msp
+import random
 
 from argparse import ArgumentParser
 
-parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
-parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
-parser.add_argument(
-    "--output", "-o", required=True, help="Output file for generated isomers"
-)
-args = parser.parse_args()
+
+def parse_args():
+    parser = ArgumentParser(description="Find indistinguishable peptides using MSCI")
+    parser.add_argument("--input", "-i", required=True, help="Input file with peptides")
+    parser.add_argument(
+        "--output", "-o", required=True, help="Output file for generated isomers"
+    )
+    return parser.parse_args()
+
+
+def random_positional_isomer(peptide: str) -> str:
+    """Generate a random positional isomer by swapping two random amino acides."""
+    if len(peptide) < 2:
+        return peptide  # No swap possible
+
+    # pick two distinct positions
+    i, j = random.sample(range(len(peptide)), 2)
+
+    # swap characters
+    s_list = list(peptide)
+    s_list[i], s_list[j] = s_list[j], s_list[i]
+
+    return "".join(s_list)
 
 
 def generate_positional_isomers(peptide: str) -> list[str]:
@@ -38,6 +49,7 @@ def generate_positional_isomers(peptide: str) -> list[str]:
 
 
 if __name__ == "__main__":
+    args = parse_args()
     input_file = args.input
     output_file = args.output
     df = pd.read_csv(input_file, header=None, names=["Peptide"])
