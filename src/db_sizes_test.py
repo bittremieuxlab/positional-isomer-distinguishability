@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 from generate_random_dbs import generate_random_dbs
 from msci_runner import find_indistinguishable_peptides
-from src.generate_positional_isomers import random_positional_isomer
+from generate_positional_isomers import random_positional_isomer
 from utils import write_db, read_pool_dir
 
 
