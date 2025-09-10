@@ -52,10 +52,6 @@ def predict_spectra(
 ):
     pred_file = f"{Path(input_file).with_suffix('')}.msp"
 
-    if os.path.exists(pred_file):
-        spectra = list(load_from_msp(pred_file))
-        return spectra, pred_file
-
     processor = PeptideProcessor(
         input_file=input_file,
         collision_energy=collision_energy,

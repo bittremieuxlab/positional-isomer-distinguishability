@@ -106,12 +106,12 @@ def indistinguishability_from_db(
 
 if __name__ == "__main__":
     search_pep_file = "search_db/charlottes13peptides.csv"
-    db_file = "search_db/canonical_human_peptides_8_12.csv_mz_filtered.msp"
-    charge = 1
+    db_file = "search_db/canonical_human_peptides_8_12.csv"
+    charge = 2
     indistinguishability_from_db(
         search_pep_file,
         db_file,
         charge=charge,
         output_file=f"search_db/charlottes13peptides_canonical_human_peptides_8_12_charge_{charge}.csv",
-        prefilter_mz=False,
+        prefilter_mz=True,
     )
