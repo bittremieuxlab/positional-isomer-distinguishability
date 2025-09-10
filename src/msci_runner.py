@@ -1,17 +1,19 @@
 import logging
+from argparse import ArgumentParser
 from functools import partial
 from multiprocessing import cpu_count, Pool, Manager
 from pathlib import Path
 
 import pandas as pd
-from MSCI.Preprocessing.Koina import PeptideProcessor
 from MSCI.Preprocessing.Parsing import read_msp_file
-from matchms.importing import load_from_msp
 from tqdm import tqdm
 
-from utils import process_spectra_pairs, process_peptide_combinations
-
-from argparse import ArgumentParser
+from utils import (
+    predict_spectra,
+    process_search_db_pairs,
+    process_spectra_pairs,
+    process_peptide_combinations,
+)
 
 logging.getLogger("matchms").setLevel(logging.ERROR)
 
@@ -128,6 +130,63 @@ def parallel_process_spectra_pairs(
     return pd.concat(dfs, ignore_index=True)
 
 
+def parallel_process_search_db_pairs(
+    spectra_pairs,
+    spectra_search,
+    spectra_db,
+    mz_irt_search_df,
+    mz_irt_db_df,
+    tolerance=0,
+    ppm=0,
+    m=0,
+    n=0.5,
+    n_chunks=None,
+):
+    if n_chunks is None:
+        n_chunks = cpu_count()
+
+    # Split the pairs into roughly equal chunks
+    chunk_size = (len(spectra_pairs) + n_chunks - 1) // n_chunks
+    chunks = [
+        spectra_pairs[i : i + chunk_size]
+        for i in range(0, len(spectra_pairs), chunk_size)
+    ]
+
+    with Manager() as manager:
+        progress_queue = manager.Queue()
+        func = partial(
+            process_search_db_pairs,
+            spectra_search=spectra_search,
+            spectra_db=spectra_db,
+            mz_irt_search_df=mz_irt_search_df,
+            mz_irt_db_df=mz_irt_db_df,
+            tolerance=tolerance,
+            ppm=ppm,
+            m=m,
+            n=n,
+            progress_queue=progress_queue,
+        )
+
+        with Pool(n_chunks) as pool:
+            # Launch jobs
+            results_async = pool.map_async(func, chunks)
+
+            # Show progress bar
+            with tqdm(
+                total=len(spectra_pairs), desc="Processing spectra pairs"
+            ) as pbar:
+                processed = 0
+                while processed < len(spectra_pairs):
+                    progress_queue.get()
+                    processed += 1
+                    pbar.update(1)
+
+            # Collect results
+            dfs = results_async.get()
+
+    return pd.concat(dfs, ignore_index=True)
+
+
 def find_indistinguishable_peptides(
     input_file: str,
     collision_energy: int = 30,
@@ -158,7 +217,7 @@ def find_indistinguishable_peptides(
 
     :return:
     """
-    processor = PeptideProcessor(
+    spectra, pred_file = predict_spectra(
         input_file=input_file,
         collision_energy=collision_energy,
         charge=charge,
@@ -166,26 +225,11 @@ def find_indistinguishable_peptides(
         model_irt=model_irt,
     )
 
-    pred_file = f"{Path(input_file).with_suffix('')}.msp"
-
-    if output_file is None:
-        if input_file.endswith(".csv"):
-            output_file = f"{Path(input_file).with_suffix('')}.csv.csv"
-        else:
-            output_file = f"{Path(input_file).with_suffix('')}.csv"
-
-    processor.process(pred_file)
-
-    if Path(pred_file).stat().st_size == 0:
-        raise RuntimeError("Generating spectrum predictions failed")
-
-    print("Got spectrum predictions")
-    spectra = list(load_from_msp(pred_file))
     mz_irt_df = read_msp_file(pred_file)
     groups_df = process_peptide_combinations(
         mz_irt_df, mz_tolerance, irt_tolerance, use_ppm=False
     )
-    print("Got peptide groups")
+
     groups_df.columns = groups_df.columns.str.replace(" ", "")
     index_array = groups_df[["index1", "index2"]].values.astype(int)
     result = parallel_process_spectra_pairs(
@@ -196,6 +240,13 @@ def find_indistinguishable_peptides(
         tolerance=peak_tolerance,
         ppm=peak_ppm,
     )
+
+    if output_file is None:
+        if input_file.endswith(".csv"):
+            output_file = f"{Path(input_file).with_suffix('')}.csv.csv"
+        else:
+            output_file = f"{Path(input_file).with_suffix('')}.csv"
+
     result.to_csv(output_file, index=False)
 
 

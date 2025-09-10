@@ -207,3 +207,9 @@ marimo/_lsp/
 __marimo__/
 
 .idea/
+
+random_dbs/
+
+db_size_diversity/
+
+search_db/

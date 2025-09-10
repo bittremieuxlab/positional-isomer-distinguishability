@@ -87,12 +87,14 @@ def plot_size_diversity_dict(data):
     plt.figure(figsize=(8, 5))
     for diversity, group in plot_df.groupby("diversity"):
         plt.plot(
-            group["size"], group["value"], marker="o", label=f"Diversity={diversity}"
+            group["size"],
+            group["value"],
+            marker="o",
+            label=f"Positional isomer fraction: {diversity}",
         )
 
-    plt.xlabel("Size")
-    plt.ylabel("Value")
-    plt.title("Value vs Size for Different Diversities")
+    plt.xlabel("DB size")
+    plt.ylabel("Fraction with similarity score >= 0.7")
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -101,7 +103,7 @@ def plot_size_diversity_dict(data):
 if __name__ == "__main__":
     # time_test()
     results = db_size_diversity(
-        sizes=[5e4, 1e5, 1.5e5],
+        sizes=[1e3, 5e3, 1e4, 5e4, 1e5],
         diversities=[0.0, 0.25, 0.5, 0.75],
         out_dir="db_size_diversity",
     )
