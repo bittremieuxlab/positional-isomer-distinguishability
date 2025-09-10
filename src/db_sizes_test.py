@@ -103,7 +103,7 @@ def plot_size_diversity_dict(data):
 if __name__ == "__main__":
     # time_test()
     results = db_size_diversity(
-        sizes=[1e3, 5e3, 1e4, 5e4, 1e5],
+        sizes=[3e5],
         diversities=[0.0, 0.25, 0.5, 0.75],
         out_dir="db_size_diversity",
     )
