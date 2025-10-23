@@ -4,6 +4,8 @@ channels:
   - defaults
 dependencies:
   - pandas
+  - pandarallel
+  - tqdm
   - pip:
     - MSCI==0.2.3
     - pyopenms
