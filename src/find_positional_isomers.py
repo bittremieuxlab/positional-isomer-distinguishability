@@ -3,7 +3,7 @@ from itertools import combinations
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from src.utils import read_pool_dir
+from utils import read_pool_dir
 
 import random
 import os
@@ -33,6 +33,18 @@ def group_by_composition(peptides: list[str]) -> dict[str, list[str]]:
     return groups
 
 
+def group_by_IL_composition(peptides: list[str]) -> dict[str, list[str]]:
+    """
+    Group peptides by their amino acid composition.
+    Key = sorted string of amino acids (multiset signature).
+    """
+    groups = defaultdict(list)
+    for pep in peptides:
+        signature = "".join(sorted(pep.replace("I", "L")))
+        groups[signature].append(pep)
+    return groups
+
+
 def find_isomers_in_group(peptides: list[str], pbar=None) -> list[tuple[str, str]]:
     isomer_pairs = []
     for pep1, pep2 in combinations(peptides, 2):
@@ -41,6 +53,18 @@ def find_isomers_in_group(peptides: list[str], pbar=None) -> list[tuple[str, str
         if pbar:
             pbar.update(1)
     return isomer_pairs
+
+
+def find_IL_isomers_in_group(peptides: list[str], pbar=None) -> list[tuple[str, str]]:
+    il_pairs = []
+    for pep1, pep2 in combinations(peptides, 2):
+        pep1_IL = pep1.replace("I", "L")
+        pep2_IL = pep2.replace("I", "L")
+        if pep1_IL == pep2_IL:
+            il_pairs.append((pep1, pep2))
+        if pbar:
+            pbar.update(1)
+    return il_pairs
 
 
 def find_positional_isomers(
@@ -64,6 +88,27 @@ def find_positional_isomers(
             for future in as_completed(futures):
                 isomer_pairs.extend(future.result())
     return isomer_pairs
+
+
+def find_I_L_isomers(
+    peptides: list[str], max_workers: int = 4
+) -> list[tuple[str, str]]:
+    """
+    Find all pairs of peptides that differ only by I/L substitutions.
+    """
+    il_pairs = []
+    groups = group_by_IL_composition(peptides)
+    total_comparisons = sum(len(list(combinations(g, 2))) for g in groups.values())
+    with tqdm(total=total_comparisons, desc="Checking pairs") as pbar:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(find_IL_isomers_in_group, g, pbar)
+                for g in groups.values()
+                if len(g) > 1
+            ]
+            for future in as_completed(futures):
+                il_pairs.extend(future.result())
+    return il_pairs
 
 
 def main(data_folder: str = "data"):
