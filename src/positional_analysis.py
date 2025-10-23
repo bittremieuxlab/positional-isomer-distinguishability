@@ -4,6 +4,7 @@ import seaborn as sns
 import numpy as np
 import scipy.stats as stats
 import ast
+from matplotlib.ticker import FuncFormatter
 
 
 def is_positional_isomer(peptide1: str, peptide2: str) -> bool:
@@ -70,6 +71,7 @@ def plot_isomer_distance(df):
     plt.ylabel("Similarity Score")
     plt.ylim(0, 1)
     plt.grid(axis="y")
+    plt.gca().xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x)}"))
     plt.show()
 
 
@@ -89,11 +91,16 @@ def plot_isomer_position(df):
 
 
 def plot_isomer_aa(df):
-    # Order df based on positional_aa
-    df = df.sort_values(by="positional_aa")
+    # Order df based on median similarity score per positional_aa
+    medians = (
+        df.groupby("positional_aa")["similarity_score"]
+        .median()
+        .sort_values(ascending=False)
+    )
     plt.figure(figsize=(10, 6))
     sns.boxplot(
         data=df,
+        order=medians.index,
         x="positional_aa",
         y="similarity_score",
     )
@@ -101,7 +108,7 @@ def plot_isomer_aa(df):
     plt.xlabel("Positional Isomer Amino Acids")
     plt.ylabel("Similarity Score")
     plt.ylim(0, 1)
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=90)
     plt.grid(axis="y")
     plt.show()
 
@@ -197,21 +204,57 @@ def compare_two_outputs(
     print(f"Only in Path 2: {len(only_in_path2)} pairs")
 
 
+def plot_aa_grid(df):
+    # Split into separate AAs
+    df[["aa1", "aa2"]] = df["positional_aa"].apply(lambda x: pd.Series(list(x)))
+    # Median similarity per unique pair
+    median_sim = df.groupby(["aa1", "aa2"])["similarity_score"].median().reset_index()
+    # Pivot into symmetric matrix
+    grid = median_sim.pivot(index="aa1", columns="aa2", values="similarity_score")
+    # Ensure full symmetric matrix (fill both triangles)
+    grid = grid.combine_first(grid.T)
+    plt.figure(figsize=(8, 6))
+    cmap = plt.cm.viridis
+    im = plt.imshow(grid, cmap=cmap, interpolation="nearest")
+    plt.colorbar(im, label="Median Similarity")
+    # Annotate only visible values
+    # for (i, j), val in np.ndenumerate(grid.values):
+    #     plt.text(j, i, f"{val:.2f}", ha="center", va="center", color="w")
+    plt.xticks(range(len(grid.columns)), grid.columns)
+    plt.yticks(range(len(grid.index)), grid.index)
+    plt.title("AA Swap Median Similarity")
+    plt.show()
+
+
 msci_output_path1 = "/Users/adams/Projects/indistinguishable-peptides/positional-isomers/positional_isomers_msci_output.csv"
 msci_output_path2 = "/Users/adams/Projects/indistinguishable-peptides/positional-isomers/positional_isomers_msci_output_tims.csv"
 # msci_output_path = "/Users/adams/Projects/indistinguishable-peptides/hla-query/hla_noPTM_peptides_canonical_human_peptides_8_12_output.csv"
-msci_output_path = "/Users/adams/Projects/indistinguishable-peptides/hla-query/hla_noPTM_peptides_canonical_human_peptides_8_12_charge_1.csv"
+# msci_output_path = "/Users/adams/Projects/indistinguishable-peptides/hla-query/hla_noPTM_peptides_canonical_human_peptides_8_12_charge_1.csv"
+msci_output_path = "/Users/adams/Projects/indistinguishable-peptides/hla-query/charlottes13peptides_canonical_human_peptides_8_12_charge_2.csv"
+msci_output_path = "/Users/adams/Projects/indistinguishable-peptides/hla-query/mhcquant3peptides_canonical_human_peptides_8_12_charge_2.csv"
 
-compare_two_outputs(
-    msci_output_path1, msci_output_path2, rt_cutoff=5, similarity_cutoff=0.7
-)
+
+def main(msci_output_path, pep1="peptide 1", pep2="peptide 2"):
+    df = pd.read_csv(msci_output_path)
+    df = label_positional_isomers(df, pep1=pep1, pep2=pep2)
+    return df
+
 
 df = pd.read_csv(msci_output_path)
 df = label_positional_isomers(df, pep1="peptide_search", pep2="peptide_db")
 
-found_peptides = df[(df["similarity_score"] > 0.7)][
-    ["peptide_search"]
-].drop_duplicates()
+found_peptides = (
+    df[(df["similarity_score"] > 0.7)]["peptide_search"]
+    # .str.replace("/1", "")
+    .str.replace("/2", "").drop_duplicates()
+)
+found_isomers = (
+    df[(df["similarity_score"] > 0.7)]["peptide_db"]
+    .str.replace("/1", "")
+    .drop_duplicates()
+)
+
+df.similarity_score.max()
 
 selected_peptide_list = [
     "HELEKKIEL",
@@ -229,26 +272,79 @@ selected_peptide_list = [
     "TPHPSELKVM",
 ]
 
-found_peptides[found_peptides["peptide_search"].isin(selected_peptide_list)]
 
-report_isomer_stats(df)
+def find_specific_peptides(df, selected_peptide_list):
+    found_peptides = (
+        df[(df["similarity_score"] > 0.7)]["peptide_search"]
+        # .str.replace("/1", "")
+        .str.replace("/2", "").drop_duplicates()
+    )
+    found_isomers = (
+        df[(df["similarity_score"] > 0.7)]["peptide_db"]
+        .str.replace("/1", "")
+        .drop_duplicates()
+    )
+    print(f"Found {len(found_peptides)} unique peptides with similarity > 0.7")
+    print(f"Found {len(found_isomers)} unique isomers with similarity > 0.7")
+    print(
+        f"Selected peptides found in peptides: {len(found_peptides[found_peptides.isin(selected_peptide_list)])}"
+    )
+    print(
+        f"Selected peptides found in isomers: {len(found_isomers[found_isomers.isin(selected_peptide_list)])}"
+    )
+    found_selected_peptides = []
+    for pep in selected_peptide_list:
+        if pep in found_peptides.values:
+            found_selected_peptides.append(pep)
+        else:
+            continue
+    return found_selected_peptides
 
 
-plot_isomer_position(
-    df[
-        (df["is_positional_isomer"] == True)
-        & (df["is_positional_isomer_distance"] == 1)
-        # & (df["RT_diff"] < 0.5)
+if __name__ == "__main__":
+    # compare_two_outputs(
+    #     msci_output_path1, msci_output_path2, rt_cutoff=5, similarity_cutoff=0.7
+    # )
+    df = pd.read_csv(msci_output_path)
+    df = label_positional_isomers(df, pep1="peptide_search", pep2="peptide_db")
+    report_isomer_stats(df)
+    plot_isomer_position(
+        df[
+            (df["is_positional_isomer"] == True)
+            & (df["is_positional_isomer_distance"] == 1)
+            # & (df["RT_diff"] < 0.5)
+        ]
+    )
+    plot_isomer_aa(
+        df[
+            (df["similarity_score"] > 0.7)
+            & (df["peptide_search"] != df["peptide_db"])
+            # (df["is_positional_isomer"] == True)
+            # & (df["is_positional_isomer_distance"] == 1)
+            # (df["RT_diff"] < 0.5)
+            # & (df["RT_diff"] < 0.5)
+        ]
+    )
+    found_peptides_df = df[(df["similarity_score"] > 0.7)]
+    found_peptides_df["found_peptide_search"] = found_peptides_df[
+        "peptide_search"
+    ].str.replace("/2", "")
+    selected_peptide_list = [
+        "HELEKKIEL",
+        "TFKEKVTSL",
+        "VEEDFQQKL",
+        "YEIDDVERL",
+        "LPLHKVKSL",
+        "KVAELLEKY",
+        "DRYLLVSQF",
+        "VVHLIKNAY",
+        "TYSEKTTLF",
+        "ALKARTVTF",
+        "KLFTSTGLK",
+        "KYLTIYLQK",
+        "TPHPSELKVM",
     ]
-)
-
-plot_isomer_aa(
-    df[
-        (df["similarity_score"] > 0.7)
-        & (df["peptide_search"] != df["peptide_db"])
-        # (df["is_positional_isomer"] == True)
-        # & (df["is_positional_isomer_distance"] == 1)
-        # (df["RT_diff"] < 0.5)
-        # & (df["RT_diff"] < 0.5)
+    found_peptides_df["found_peptide_search"].isin(selected_peptide_list)
+    found_peptides_df[
+        found_peptides_df["peptide_search"] != found_peptides_df["peptide_db"]
     ]
-)
