@@ -2,12 +2,126 @@ import pandas as pd
 import numpy as np
 from utils import read_pool_dir
 from find_positional_isomers import find_positional_isomers, find_I_L_isomers
-from positional_analysis import label_positional_isomers, plot_aa_grid_bottom_triangle
+from positional_analysis import (
+    label_positional_isomers,
+    plot_aa_grid_bottom_triangle,
+    plot_position_length_ratio_vs_similarity,
+    plot_AA_length_grid_bottom_triangle,
+)
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 data_folder = "/Users/adams/Code/positional-isomer-distinguishability/data"
 
 df = read_pool_dir(data_folder)
 len(df["Sequence"].unique().tolist())
+
+# Look for peptides with "YW" or "WY" in the sequence
+df_yw = df[df["Sequence"].str.contains("YW|WY")]
+len(df_yw["Sequence"].unique().tolist())
+
+# Generate a list of positional isomers by swapping Y and W
+isomers_yw = []
+for seq in df_yw["Sequence"].unique().tolist():
+    if "YW" in seq:
+        isomer_seq = seq.replace("YW", "WY")
+        isomers_yw.append((seq, isomer_seq))
+    elif "WY" in seq:
+        isomer_seq = seq.replace("WY", "YW")
+        isomers_yw.append((seq, isomer_seq))
+
+# Create an input for MSCI (so single column with sequence)
+file_path = "/Users/adams/Projects/indistinguishable-peptides/proteometools_yw_pep1.csv"
+with open(file_path, "w") as f:
+    for seq1, seq2 in isomers_yw:
+        f.write(f"{seq1}\n")
+
+file_path = "/Users/adams/Projects/indistinguishable-peptides/proteometools_yw_pep2.csv"
+with open(file_path, "w") as f:
+    for seq1, seq2 in isomers_yw:
+        f.write(f"{seq2}\n")
+
+msci_output_path = "/Users/adams/Projects/indistinguishable-peptides/proteometools_yw_db_charge_2_deeplc.csv"
+df_yw_msci = pd.read_csv(msci_output_path)
+df_yw_msci = label_positional_isomers(
+    df_yw_msci, pep1="peptide_search", pep2="peptide_db"
+)
+df_yw_msci.columns
+df_yw_msci[(df_yw_msci["positional_aa"] == "WY")][
+    ["peptide_search", "peptide_db", "similarity_score"]
+]
+
+len(df_yw_msci[(df_yw_msci["positional_aa"] == "WY")])
+df_yw_msci[(df_yw_msci["positional_aa"] == "WY")]["similarity_score"].describe()
+df_yw_msci["peptide_search"] = df_yw_msci["peptide_search"].str.replace("/2", "")
+df_yw_msci["peptide_db"] = df_yw_msci["peptide_db"].str.replace("/2", "")
+df_yw_msci["peptide_length"] = df_yw_msci["peptide_search"].apply(len)
+df_yw_msci["r_count"] = df_yw_msci["peptide_search"].str.count("R")
+df_yw_msci["p_count"] = df_yw_msci["peptide_search"].str.count("P")
+
+df_yw_msci["position_length_ratio_start"] = (
+    df_yw_msci["first_difference_position"] / df_yw_msci["peptide_length"]
+)
+df_yw_msci["position_length_ratio_end"] = (
+    df_yw_msci["second_difference_position"] / df_yw_msci["peptide_length"]
+)
+
+for r in range(max(df_yw_msci["r_count"]) + 1):
+    # plot_isomer_position(
+    #     df_yw_msci[
+    #         (df_yw_msci["positional_aa"] == "WY")
+    #         # & (df_yw_msci["peptide_length"] == 9)
+    #         & (df_yw_msci["is_positional_isomer_distance"] == 1)
+    #         & (df_yw_msci["r_count"] == r)
+    #     ],
+    #     plot_title=f"Proteometools YW isomers with {r} R residues",
+    #     # f"/Users/adams/Projects/indistinguishable-peptides/Figures/proteometools_yw_isomer_position_9_{r}R.png",
+    #     plot_path=f"/Users/adams/Projects/indistinguishable-peptides/Figures/proteometools_yw_isomer_{r}R.png",
+    # )
+    for position_length_ratio in [
+        "position_length_ratio_start",
+        "position_length_ratio_end",
+    ]:
+        plot_position_length_ratio_vs_similarity(
+            df_yw_msci[
+                (df_yw_msci["positional_aa"] == "WY")
+                & (df_yw_msci["is_positional_isomer_distance"] == 1)
+                & (df_yw_msci["r_count"] == r)
+            ],
+            position_length_ratio=position_length_ratio,
+            plot_path=f"/Users/adams/Projects/indistinguishable-peptides/Figures/proteometools_yw{position_length_ratio}_vs_similarity_{r}R.png",
+            plot_title=f"Proteometools YW Isomers - {position_length_ratio.replace('_', ' ').title()} - {r} R residues",
+        )
+
+
+plot_AA_length_grid_bottom_triangle(
+    df_yw_msci[
+        (df_yw_msci["positional_aa"] == "WY")
+        & (df_yw_msci["is_positional_isomer_distance"] == 1)
+    ],
+    count_column="p_count",
+    count_name="P Count",
+    plot_path=f"/Users/adams/Projects/indistinguishable-peptides/Figures/proteometools_yw_P_count_grid.png",
+)
+
+
+df_yw_msci[
+    (df_yw_msci["positional_aa"] == "WY")
+    & (df_yw_msci["is_positional_isomer_distance"] == 1)
+    & (df_yw_msci["peptide_length"] == 9)
+][["peptide_search", "peptide_db", "similarity_score", "first_difference_position"]]
+
+
+df_yw_msci[
+    (df_yw_msci["positional_aa"] == "WY")
+    # & (df_yw_msci["peptide_length"] == 9)
+    & (df_yw_msci["is_positional_isomer_distance"] == 1)
+    & (df_yw_msci["r_count"] == 3)
+][["peptide_search", "peptide_db", "similarity_score", "position_length_ratio"]]
+
+df_yw_msci[(df_yw_msci["positional_aa"] == "WY")].peptide_length.value_counts()
+
+# Investigate positional isomers in proteometools data
 isomers = find_positional_isomers(df["Sequence"].unique().tolist(), max_workers=8)
 df_isomers = pd.DataFrame(isomers, columns=["Peptide1", "Peptide2"])
 df_isomers = label_positional_isomers(df_isomers, pep1="Peptide1", pep2="Peptide2")
