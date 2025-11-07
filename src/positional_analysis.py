@@ -76,19 +76,23 @@ def plot_isomer_distance(df, plot_path: str = None):
     plt.savefig(plot_path + "/isomer_distance.png", dpi=300)
 
 
-def plot_isomer_position(df):
+def plot_isomer_position(
+    df,
+    plot_path: str = None,
+    plot_title: str = "Similarity Score by Positional Isomer Position",
+):
     plt.figure(figsize=(10, 6))
     sns.boxplot(
         data=df,
         x="first_difference_position",
         y="similarity_score",
     )
-    plt.title("Similarity Score by Positional Isomer Position")
+    plt.title(plot_title)
     plt.xlabel("Positional Isomer Position")
     plt.ylabel("Similarity Score")
     plt.ylim(0, 1)
     plt.grid(axis="y")
-    plt.show()
+    plt.savefig(plot_path, dpi=300)
 
 
 def plot_isomer_aa(df):
@@ -112,6 +116,35 @@ def plot_isomer_aa(df):
     plt.xticks(rotation=90)
     plt.grid(axis="y")
     plt.show()
+
+
+def plot_position_length_ratio_vs_similarity(
+    df,
+    position_length_ratio: str = "position_length_ratio_start",
+    plot_path: str = None,
+    plot_title: str = None,
+):
+    plt.figure(figsize=(12, 6))
+    sns.set_context("talk")
+    sns.scatterplot(
+        data=df,
+        x=position_length_ratio,
+        y="similarity_score",
+        alpha=0.4,
+        color="#8ac6d0",
+    )
+    plt.xlabel("Position Length Ratio")
+    plt.ylabel("Similarity Score")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.grid(axis="y")
+    if plot_title:
+        plt.title(plot_title)
+    sns.despine()
+    plt.savefig(
+        plot_path,
+        dpi=300,
+    )
 
 
 def report_isomer_stats(df):
@@ -253,6 +286,50 @@ def plot_aa_grid_bottom_triangle(df, plot_path):
     ax = plt.gca()
     sns.despine(ax=ax, top=True, right=True)
     plt.savefig(plot_path, dpi=600)
+
+
+def plot_AA_length_grid_bottom_triangle(
+    df, plot_path, count_column="R_count", count_name="R Count"
+):
+    ordered_lengths = list(
+        range(min(df["peptide_length"]), max(df["peptide_length"]) + 1)
+    )
+    ordered_R_counts = list(range(0, df[count_column].max() + 1))
+    # Median similarity per unique pair
+    median_sim = (
+        df.groupby([count_column, "peptide_length"])["similarity_score"]
+        .median()
+        .reset_index()
+    )
+    # Pivot into symmetric matrix
+    grid = median_sim.pivot(
+        index=count_column, columns="peptide_length", values="similarity_score"
+    )
+    grid = grid.reindex(index=ordered_R_counts, columns=ordered_lengths)
+    plt.figure(figsize=(12, 6))
+    cmap = plt.cm.viridis
+    im = plt.imshow(grid, cmap=cmap, interpolation="nearest", aspect="auto")
+    cbar = plt.colorbar(im, label="Median Similarity Score")
+    plt.grid(visible=False)
+    plt.tick_params(bottom=True, left=True)
+    plt.xticks(range(len(grid.columns)), grid.columns)
+    plt.yticks(range(len(grid.index)), grid.index)
+    # Get the current Axes
+    ax = plt.gca()
+    # Remove internal gridlines and make outer border black
+    plt.grid(False)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("black")
+        spine.set_linewidth(1.5)
+    for spine in cbar.ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("black")
+        spine.set_linewidth(1.5)
+    plt.tick_params(bottom=True, left=True, color="black", labelcolor="black")
+    plt.xlabel("Peptide Length")
+    plt.ylabel(count_name)
+    plt.savefig(plot_path, dpi=300)
 
 
 def find_specific_peptides(df, selected_peptide_list):
