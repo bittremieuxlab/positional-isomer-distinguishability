@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from generate_random_dbs import generate_random_dbs
 from msci_runner import find_indistinguishable_peptides
 from generate_positional_isomers import random_positional_isomer
-from utils import write_db, read_pool_dir
+from utils import write_db
 
 
 def time_test():
@@ -45,7 +45,9 @@ def replace_with_positional_isomers(df, frac=0.5):
     return pd.concat([to_keep, to_add])
 
 
-def db_size_diversity(dir_path="data", sizes=None, diversities=None, out_dir=""):
+def db_size_diversity(
+    dir_path="data", sizes=None, diversities=None, out_dir="", n_chunks=None
+):
     random_dbs = generate_random_dbs(dir_path=dir_path, sizes=sizes)
     os.makedirs(out_dir, exist_ok=True)
     results = defaultdict(dict)
@@ -60,7 +62,7 @@ def db_size_diversity(dir_path="data", sizes=None, diversities=None, out_dir="")
                 out_dir, f"{len(db)}_{diversity}.csv"
             )
             if not os.path.isfile(indistinguisable_peptides_csv):
-                find_indistinguishable_peptides(out_file)
+                find_indistinguishable_peptides(out_file, n_chunks=n_chunks)
 
             results[len(db)][diversity] = pd.read_csv(indistinguisable_peptides_csv)
     return results
@@ -103,8 +105,10 @@ def plot_size_diversity_dict(data):
 if __name__ == "__main__":
     # time_test()
     results = db_size_diversity(
-        sizes=[3e5],
+        sizes=[6e5],
         diversities=[0.0, 0.25, 0.5, 0.75],
-        out_dir="db_size_diversity",
+        out_dir="db_immuno_size_diversity",
+        dir_path="immuno_peptides",
+        n_chunks=16,
     )
-    plot_size_diversity_dict(results)
+    # plot_size_diversity_dict(results)
