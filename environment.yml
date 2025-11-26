@@ -3,9 +3,11 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - python=3.11
   - pandas
   - pandarallel
   - tqdm
+  - matplotlib
   - pip:
     - MSCI==0.2.3
     - pyopenms
